@@ -14,6 +14,10 @@ import (
 	s3aws "github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+const (
+	fiveMB = 5 * 1024 * 1024
+)
+
 // File ...
 type File struct {
 	bucket   string
@@ -48,10 +52,9 @@ type FileWriter struct {
 
 // NewWriter ...
 func NewWriter(c *s3aws.Client) *FileWriter {
-	size := 5 * 1024 * 1024 // min size is 5MB
 	f := &FileWriter{
 		partNum: 1,
-		b:       make([]byte, size),
+		b:       make([]byte, fiveMB),
 	}
 	f.c = c
 	f.meta = make(map[string]interface{})
@@ -77,7 +80,7 @@ func (f *File) Stat() (rfs.Stat, error) {
 // Read ...
 func (f *FileReader) Read(b []byte) (int, error) {
 	if f.c == nil {
-		return -1, errors.New("file closed")
+		return -1, io.ErrClosedPipe
 	}
 	if f.cursor == f.size {
 		return 0, io.EOF
@@ -108,10 +111,25 @@ func (f *FileReader) Read(b []byte) (int, error) {
 	return int(n), err
 }
 
+// Seek ...
+func (f *FileReader) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		f.cursor = offset
+	case io.SeekCurrent:
+		f.cursor += offset
+		offset = f.cursor
+	case io.SeekEnd:
+		return 0, errors.New("cannot seek at the end of the file")
+	}
+
+	return offset, nil
+}
+
 // Write ...
 func (f *FileWriter) Write(b []byte) (n int, err error) {
 	if f.c == nil {
-		return -1, errors.New("file closed")
+		return -1, io.ErrClosedPipe
 	}
 
 	n = copy(f.b[f.cursor:], b)
@@ -128,6 +146,19 @@ func (f *FileWriter) Write(b []byte) (n int, err error) {
 	}
 
 	return n, nil
+}
+
+// Seek ...
+func (f *FileWriter) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		f.cursor = offset
+	case io.SeekCurrent:
+		f.cursor += offset
+		offset = f.cursor
+	}
+
+	return offset, nil
 }
 
 // Flush ...
@@ -160,7 +191,7 @@ func (f *FileWriter) Flush() error {
 // Close ...
 func (f *FileReader) Close() error {
 	if f.c == nil {
-		return errors.New("file already closed")
+		return io.ErrClosedPipe
 	}
 
 	f.c = nil
@@ -171,7 +202,7 @@ func (f *FileReader) Close() error {
 // Close ...
 func (f *FileWriter) Close() error {
 	if f.c == nil {
-		return errors.New("file already closed")
+		return io.ErrClosedPipe
 	}
 
 	err := f.Flush()
