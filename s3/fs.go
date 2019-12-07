@@ -123,10 +123,19 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 
 // Remove ...
 func (fs *Fs) Remove(path string) error {
-	return nil
+	if filepath.IsAbs(path) {
+		path = path[1:]
+	}
+
+	_, err := fs.c.DeleteObjectRequest(&s3aws.DeleteObjectInput{
+		Bucket: aws.String(fs.bucket),
+		Key:    aws.String(path),
+	}).Send(context.Background())
+	// TODO: check response.DeleteMarker ?
+	return err
 }
 
-// RemoveAll ...
+// RemoveAll TODO
 func (fs *Fs) RemoveAll(path string) error {
 	return nil
 }

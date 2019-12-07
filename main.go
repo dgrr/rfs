@@ -8,28 +8,42 @@ import (
 	"strings"
 )
 
-// File ...
+// File represents a file abstraction.
 type File interface {
+	// io.Closer implements the Close() function.
 	io.Closer
+
+	// io.Writer implements the Write() function.
 	io.Writer
+
+	// io.Reader implements the Read() function.
 	io.Reader
 
+	// URL returns the file url.
 	URL() *url.URL
 }
 
-// Stat ...
+// Stat TODO
 type Stat map[string]interface{}
 
-// Fs ...
+// Fs represents the filesystem abstraction.
 type Fs interface {
+	// Name returns the filesytem name.
 	Name() string
 
+	// Open returns a read-only file.
 	Open(path string) (File, error)
 
+	// Create a write-only file.
+	//
+	// If the path where the file is located doesn't exits
+	// it will be created automatically.
 	Create(path string) (File, error)
 
+	// Remove removes the specified file.
 	Remove(path string) error
 
+	// RemoveAll removes all the files and directories recursively.
 	RemoveAll(path string) error
 
 	// TODO: Stat(path string) (Stat, error)
@@ -42,7 +56,11 @@ var (
 	fsMap = make(map[string]MakeFunc)
 )
 
-// Dial ...
+// Dial configures the filesystem based on the kind, root and config parameters.
+//
+// kind is based on *.Kind where `*` is the name of the subpackage like s3 or file.
+// root is the root object (in S3 is the bucket). In case of `file` subpackages you can left it blank.
+// config is a map dependent on the subpackage constants.
 func Dial(kind, root string, config Config) (Fs, error) {
 	mfn, ok := fsMap[kind]
 	if !ok {
@@ -67,7 +85,9 @@ func getRoot(path string) string {
 	return path[:i]
 }
 
-// DialURL ...
+// DialURL does the same as Dial but using a URL.
+//
+// Is basically an alias of Dial(uri.Scheme, uri.Host, config)
 func DialURL(uri *url.URL, config Config) (Fs, error) {
 	if len(uri.Host) == 0 && filepath.IsAbs(uri.Path) {
 		uri.Host = getRoot(uri.Path)
@@ -75,7 +95,11 @@ func DialURL(uri *url.URL, config Config) (Fs, error) {
 	return Dial(uri.Scheme, uri.Host, config)
 }
 
-// Open ...
+// Open returns a File avoiding Fs handling.
+//
+// The fileURI parameter is a string with the file location, for example:
+// s3://my-bucket/my/file/path or
+// file:///tmp/my/file/path
 func Open(fileURI string, config Config) (File, error) {
 	uri, err := url.Parse(fileURI)
 	if err != nil {
@@ -90,7 +114,11 @@ func Open(fileURI string, config Config) (File, error) {
 	return nil, err
 }
 
-// Create ...
+// Create returns a File avoiding Fs handling.
+//
+// The fileURI parameter is a string with the file location, for example:
+// s3://my-bucket/my/file/path or
+// file:///tmp/my/file/path
 func Create(fileURI string, config Config) (File, error) {
 	uri, err := url.Parse(fileURI)
 	if err != nil {
@@ -110,7 +138,7 @@ type (
 	MakeFunc func(root string, config Config) (Fs, error)
 )
 
-// Register ...
+// Register registers a new kind on the rfs package.
 func Register(kind string, mfn MakeFunc) {
 	fsMap[kind] = mfn
 }
