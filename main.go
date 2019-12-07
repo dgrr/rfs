@@ -90,6 +90,21 @@ func Open(fileURI string, config Config) (File, error) {
 	return nil, err
 }
 
+// Create ...
+func Create(fileURI string, config Config) (File, error) {
+	uri, err := url.Parse(fileURI)
+	if err != nil {
+		return nil, err
+	}
+
+	fs, err := Dial(uri.Scheme, uri.Host, config)
+	if err == nil {
+		return fs.Create(uri.Path)
+	}
+
+	return nil, err
+}
+
 type (
 	// MakeFunc ...
 	MakeFunc func(root string, config Config) (Fs, error)

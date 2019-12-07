@@ -4,12 +4,12 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3/s3manager"
 	"github.com/dgrr/rfs"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 	s3aws "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/s3manager"
 )
 
 func getAWSConfig(region, profile string) (aws.Config, error) {
@@ -41,7 +41,7 @@ func makeFs(bucket string, config rfs.Config) (rfs.Fs, error) {
 			config[KeyID], config[SecretID], config[SessionToken],
 		)
 	}
-	region, err = s3manager.GetBucketRegion(context.Background(), awsConfig, bucket, awsConfig.Region)
+	region, err = s3manager.GetBucketRegion(context.Background(), awsConfig, bucket, region)
 	if err == nil && len(region) > 0 {
 		awsConfig.Region = region
 	}
@@ -79,28 +79,52 @@ func (fs *Fs) Open(path string) (rfs.File, error) {
 		return nil, err
 	}
 
-	file := &File{
-		path: filepath.Join(fs.bucket, path),
-		r:    resp.Body,
-		meta: make(map[string]interface{}),
-		size: aws.Int64Value(resp.ContentLength),
+	file := &FileReader{}
+	{
+		file.c = fs.c
+		file.path = filepath.Join(fs.bucket, path)
+		file.meta = make(map[string]interface{})
+		file.size = aws.Int64Value(resp.ContentLength)
+
+		for k, v := range resp.Metadata {
+			file.meta[k] = v
+		}
+		file.meta[ETag] = aws.StringValue(resp.ETag)
 	}
-	for k, v := range resp.Metadata {
-		file.meta[k] = v
-	}
-	file.meta[ETag] = aws.StringValue(resp.ETag)
 
 	return file, nil
 }
 
+// Create ...
 func (fs *Fs) Create(path string) (rfs.File, error) {
-	return nil, nil
+	if filepath.IsAbs(path) {
+		path = path[1:]
+	}
+
+	file := NewWriter(fs.c)
+	{
+		file.bucket = fs.bucket
+		file.path = path
+	}
+
+	resp, err := fs.c.CreateMultipartUploadRequest(&s3aws.CreateMultipartUploadInput{
+		Bucket: aws.String(fs.bucket),
+		Key:    aws.String(path),
+	}).Send(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	file.uploadID = aws.StringValue(resp.UploadId)
+
+	return file, nil
 }
 
+// Remove ...
 func (fs *Fs) Remove(path string) error {
 	return nil
 }
 
+// RemoveAll ...
 func (fs *Fs) RemoveAll(path string) error {
 	return nil
 }
