@@ -19,6 +19,9 @@ type File interface {
 	// io.Reader implements the Read() function.
 	io.Reader
 
+	// io.ReaderAt implements ReadAt() function.
+	io.ReaderAt
+
 	// io.Seeker implements the Seek() function.
 	// TODO: io.Seeker
 

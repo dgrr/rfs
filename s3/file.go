@@ -33,6 +33,11 @@ func (f *File) Read(_ []byte) (int, error) {
 	return -1, errors.New("file not open for reading")
 }
 
+// ReadAt ...
+func (f *File) ReadAt(_ []byte, _ int64) (int, error) {
+	return -1, errors.New("file not open for reading")
+}
+
 func (f *File) Write(_ []byte) (int, error) {
 	return -1, errors.New("file not open for writing")
 }
@@ -79,14 +84,28 @@ func (f *File) Stat() (rfs.Stat, error) {
 
 // Read ...
 func (f *FileReader) Read(b []byte) (int, error) {
-	if f.c == nil {
-		return -1, io.ErrClosedPipe
-	}
 	if f.cursor == f.size {
 		return 0, io.EOF
 	}
 
-	max := f.cursor + int64(len(b)-1)
+	n, err := f.readAt(b, f.cursor)
+	if err == nil {
+		f.cursor += int64(n)
+	}
+	return n, err
+}
+
+// ReadAt ...
+func (f *FileReader) ReadAt(p []byte, off int64) (int, error) {
+	return f.readAt(p, off)
+}
+
+func (f *FileReader) readAt(b []byte, offset int64) (int, error) {
+	if f.c == nil {
+		return -1, io.ErrClosedPipe
+	}
+
+	max := offset + int64(len(b)-1)
 	if max > f.size {
 		max = f.size
 	}
@@ -95,7 +114,7 @@ func (f *FileReader) Read(b []byte) (int, error) {
 		Bucket: aws.String(f.bucket),
 		Key:    aws.String(f.path),
 		Range: aws.String(
-			fmt.Sprintf("bytes=%d-%d", f.cursor, max),
+			fmt.Sprintf("bytes=%d-%d", offset, max),
 		),
 	}).Send(context.Background())
 	if err != nil {
@@ -103,9 +122,6 @@ func (f *FileReader) Read(b []byte) (int, error) {
 	}
 
 	n, err := io.Copy(&byteWriter{b, 0}, resp.Body)
-	if err == nil {
-		f.cursor += n
-	}
 	resp.Body.Close()
 
 	return int(n), err
