@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/dgrr/rfs"
@@ -78,7 +79,33 @@ func (f *FileReader) Read(b []byte) (int, error) {
 	if f.c == nil {
 		return -1, errors.New("file closed")
 	}
-	return 0, nil
+	if f.cursor == f.size {
+		return 0, io.EOF
+	}
+
+	max := f.cursor + int64(len(b)-1)
+	if max > f.size {
+		max = f.size
+	}
+
+	resp, err := f.c.GetObjectRequest(&s3aws.GetObjectInput{
+		Bucket: aws.String(f.bucket),
+		Key:    aws.String(f.path),
+		Range: aws.String(
+			fmt.Sprintf("bytes=%d-%d", f.cursor, max),
+		),
+	}).Send(context.Background())
+	if err != nil {
+		return -1, err
+	}
+
+	n, err := io.Copy(&byteWriter{b, 0}, resp.Body)
+	if err == nil {
+		f.cursor += n
+	}
+	resp.Body.Close()
+
+	return int(n), err
 }
 
 // Write ...
@@ -87,15 +114,15 @@ func (f *FileWriter) Write(b []byte) (n int, err error) {
 		return -1, errors.New("file closed")
 	}
 
-	n = copy(f.b[f.size:], b)
-	f.size += int64(n)
+	n = copy(f.b[f.cursor:], b)
+	f.cursor += int64(n)
 
-	if f.size == int64(cap(f.b)) {
+	if f.cursor == f.size {
 		r := len(b) - n // bytes to append
 		err = f.Flush()
 		if err == nil {
 			f.b = append(f.b[:0], b[n:]...)
-			f.size = int64(r)
+			f.cursor = int64(r)
 			n += r // append bytes readed
 		}
 	}
@@ -105,7 +132,7 @@ func (f *FileWriter) Write(b []byte) (n int, err error) {
 
 // Flush ...
 func (f *FileWriter) Flush() error {
-	size := len(f.b)
+	size := f.cursor
 	partNum := f.partNum
 
 	resp, err := f.c.UploadPartRequest(&s3aws.UploadPartInput{

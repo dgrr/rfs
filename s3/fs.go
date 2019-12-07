@@ -70,19 +70,21 @@ func (fs *Fs) Open(path string) (rfs.File, error) {
 	if filepath.IsAbs(path) {
 		path = path[1:]
 	}
-	input := s3aws.GetObjectInput{
+	input := s3aws.HeadObjectInput{
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(path),
 	}
-	resp, err := fs.c.GetObjectRequest(&input).Send(context.Background())
+	resp, err := fs.c.HeadObjectRequest(&input).Send(context.Background())
 	if err != nil {
+		// TODO: Translate no exist error
 		return nil, err
 	}
 
 	file := &FileReader{}
 	{
 		file.c = fs.c
-		file.path = filepath.Join(fs.bucket, path)
+		file.bucket = fs.bucket
+		file.path = path
 		file.meta = make(map[string]interface{})
 		file.size = aws.Int64Value(resp.ContentLength)
 
