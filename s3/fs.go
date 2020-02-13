@@ -125,10 +125,12 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 		file.path = path
 	}
 
-	resp, err := fs.c.CreateMultipartUploadRequest(&s3aws.CreateMultipartUploadInput{
-		Bucket: aws.String(fs.bucket),
-		Key:    aws.String(path),
-	}).Send(context.Background())
+	resp, err := fs.c.CreateMultipartUploadRequest(
+		&s3aws.CreateMultipartUploadInput{
+			Bucket: aws.String(fs.bucket),
+			Key:    aws.String(path),
+		},
+	).Send(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -160,16 +162,33 @@ func (fs *Fs) RemoveAll(path string) error {
 // in the tree, including root. All errors that arise visiting files and directories are
 // filtered by walkFn.
 func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) error {
-	req := fs.c.ListObjectsV2Request(&s3.ListObjectsV2Input{Bucket: aws.String(fs.bucket), Prefix: aws.String(root)})
-	res, err := req.Send(context.TODO())
-	if err != nil {
-		return err
+	if filepath.IsAbs(root) {
+		root = root[1:]
 	}
-	for _, object := range res.Contents {
-		err = walkFn(*object.Key, nil, nil)
+
+	last := ""
+	for {
+		req := fs.c.ListObjectsV2Request(
+			&s3.ListObjectsV2Input{
+				Bucket:     aws.String(fs.bucket),
+				Prefix:     aws.String(root),
+				StartAfter: aws.String(last),
+			},
+		)
+
+		res, err := req.Send(context.Background())
 		if err != nil {
 			return err
 		}
+
+		for _, object := range res.Contents {
+			err = walkFn(*object.Key, nil, nil)
+			if err != nil {
+				break
+			}
+			last = *object.Key
+		}
 	}
+
 	return nil
 }
