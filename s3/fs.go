@@ -3,6 +3,7 @@ package s3
 import (
 	"context"
 	"path/filepath"
+	"strings"
 
 	"github.com/digilant/rfs"
 
@@ -158,16 +159,57 @@ func (fs *Fs) RemoveAll(path string) error {
 	return nil
 }
 
+func (fs *Fs) ListDir(path string) ([]string, error) {
+	if filepath.IsAbs(path) {
+		path = path[1:]
+	}
+
+	files := make([]string, 0)
+	for {
+		req := fs.c.ListObjectsV2Request(
+			&s3.ListObjectsV2Input{
+				Bucket:    aws.String(fs.bucket),
+				Prefix:    aws.String(path),
+				Delimiter: aws.String("/"),
+			},
+		)
+
+		res, err := req.Send(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		if len(res.Contents) == 0 {
+			break
+		}
+
+		for _, object := range res.Contents {
+			files = append(files, aws.StringValue(object.Key))
+		}
+	}
+
+	return files, nil
+}
+
+func (fs *Fs) WalkDepth(root string, depth int, walkFn rfs.WalkFunc) error {
+	return fs.walk(root, depth, walkFn)
+}
+
 // Walk walks the file tree rooted at root, calling walkFn for each file or directory
 // in the tree, including root. All errors that arise visiting files and directories are
 // filtered by walkFn.
-func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) (err error) {
+func (fs *Fs) Walk(root string, walkFn rfs.WalkFunc) error {
+	return fs.walk(root, -1, walkFn)
+}
+
+func (fs *Fs) walk(root string, depth int, walkFn rfs.WalkFunc) (err error) {
 	if filepath.IsAbs(root) {
 		root = root[1:]
 	}
 
+	mustBreak := false
 	last := ""
-	for err == nil {
+	for err == nil && !mustBreak {
+
 		req := fs.c.ListObjectsV2Request(
 			&s3.ListObjectsV2Input{
 				Bucket:     aws.String(fs.bucket),
@@ -180,14 +222,31 @@ func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) (err error) {
 		if er != nil {
 			err = er
 		}
+		if len(res.Contents) == 0 {
+			break
+		}
 
 		if err == nil {
 			for _, object := range res.Contents {
-				err = walkFn(*object.Key, nil, nil)
+				path := aws.StringValue(object.Key)
+
+				if depth >= 0 {
+					look, err := filepath.Rel(root, path)
+					if err != nil {
+						look = path
+					}
+
+					mustBreak = strings.Count(look, "/") >= depth
+					if mustBreak {
+						break
+					}
+				}
+
+				err = walkFn(path, false)
 				if err != nil {
 					break
 				}
-				last = *object.Key
+				last = path
 			}
 		}
 	}

@@ -32,6 +32,9 @@ type File interface {
 // Stat TODO
 type Stat map[string]interface{}
 
+// WalkFunc ...
+type WalkFunc func(path string, isDir bool) error
+
 // Fs represents the filesystem abstraction.
 type Fs interface {
 	// Name returns the filesytem name.
@@ -52,9 +55,11 @@ type Fs interface {
 	// RemoveAll removes all the files and directories recursively.
 	RemoveAll(path string) error
 
-	// TODO: Stat(path string) (Stat, error)
+	ListDir(path string) ([]string, error)
 
-	Walk(root string, walkFn filepath.WalkFunc) error
+	Walk(root string, walkFn WalkFunc) error
+
+	WalkDepth(root string, depth int, walkFn WalkFunc) error
 }
 
 // Config ...
