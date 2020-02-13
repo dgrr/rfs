@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/dgrr/rfs"
+	"github.com/digilant/rfs"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	s3aws "github.com/aws/aws-sdk-go-v2/service/s3"

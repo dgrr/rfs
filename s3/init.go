@@ -1,6 +1,6 @@
 package s3
 
-import "github.com/dgrr/rfs"
+import "github.com/digilant/rfs"
 
 const (
 	Kind = "s3"
