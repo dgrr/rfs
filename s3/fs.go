@@ -4,10 +4,11 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/dgrr/rfs"
+	"github.com/digilant/rfs"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3aws "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/s3manager"
 )
@@ -54,7 +55,7 @@ func makeFs(bucket string, config rfs.Config) (rfs.Fs, error) {
 	}, nil
 }
 
-// Fs ...
+// Fs implements the interface rfs.Fs
 type Fs struct {
 	bucket string
 	c      *s3aws.Client
@@ -137,5 +138,22 @@ func (fs *Fs) Remove(path string) error {
 
 // RemoveAll TODO
 func (fs *Fs) RemoveAll(path string) error {
+	return nil
+}
+
+// Walk walks the file tree rooted at root, calling walkFn for each file or directory
+// in the tree, including root. All errors that arise visiting files and directories are
+// filtered by walkFn.
+func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) error {
+	res, err := fs.c.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(fs.bucket), Prefix: aws.String(root)})
+	if err != nil {
+		return err
+	}
+	for _, object := range res.Contents {
+		err = walkFn(*object.Key, nil, nil)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

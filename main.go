@@ -53,6 +53,8 @@ type Fs interface {
 	RemoveAll(path string) error
 
 	// TODO: Stat(path string) (Stat, error)
+
+	Walk(root string, walkFn filepath.WalkFunc) error
 }
 
 // Config ...

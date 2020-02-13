@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dgrr/rfs"
+	"github.com/digilant/rfs"
 )
 
 func makeFs(root string, config rfs.Config) (rfs.Fs, error) {
