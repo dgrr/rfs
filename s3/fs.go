@@ -33,15 +33,30 @@ func makeFs(bucket string, config rfs.Config) (rfs.Fs, error) {
 		err       error
 		region    = config[Region]
 	)
+	if len(region) == 0 {
+		region = "us-east-1"
+	}
 	awsConfig.Region = region
 
-	if profile, ok := config[Profile]; ok {
+	_, dontUseFile := config[KeyID]
+	if !dontUseFile { // so use file
+		var (
+			profile string
+			ok      bool
+		)
+		if profile, ok = config[Profile]; !ok {
+			profile = "default"
+		}
 		awsConfig, err = getAWSConfig(region, profile)
 	} else {
 		awsConfig.Credentials = aws.NewStaticCredentialsProvider(
 			config[KeyID], config[SecretID], config[SessionToken],
 		)
 	}
+	if err != nil {
+		return nil, err
+	}
+
 	region, err = s3manager.GetBucketRegion(context.Background(), awsConfig, bucket, region)
 	if err == nil && len(region) > 0 {
 		awsConfig.Region = region
