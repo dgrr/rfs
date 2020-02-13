@@ -145,7 +145,8 @@ func (fs *Fs) RemoveAll(path string) error {
 // in the tree, including root. All errors that arise visiting files and directories are
 // filtered by walkFn.
 func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) error {
-	res, err := fs.c.ListObjectsV2(&s3.ListObjectsV2Input{Bucket: aws.String(fs.bucket), Prefix: aws.String(root)})
+	req := fs.c.ListObjectsV2Request(&s3.ListObjectsV2Input{Bucket: aws.String(fs.bucket), Prefix: aws.String(root)})
+	res, err := req.Send(context.TODO())
 	if err != nil {
 		return err
 	}
