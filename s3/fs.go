@@ -161,13 +161,13 @@ func (fs *Fs) RemoveAll(path string) error {
 // Walk walks the file tree rooted at root, calling walkFn for each file or directory
 // in the tree, including root. All errors that arise visiting files and directories are
 // filtered by walkFn.
-func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) error {
+func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) (err error) {
 	if filepath.IsAbs(root) {
 		root = root[1:]
 	}
 
 	last := ""
-	for {
+	for err == nil {
 		req := fs.c.ListObjectsV2Request(
 			&s3.ListObjectsV2Input{
 				Bucket:     aws.String(fs.bucket),
@@ -176,19 +176,21 @@ func (fs *Fs) Walk(root string, walkFn filepath.WalkFunc) error {
 			},
 		)
 
-		res, err := req.Send(context.Background())
-		if err != nil {
-			return err
+		res, er := req.Send(context.Background())
+		if er != nil {
+			err = er
 		}
 
-		for _, object := range res.Contents {
-			err = walkFn(*object.Key, nil, nil)
-			if err != nil {
-				break
+		if err == nil {
+			for _, object := range res.Contents {
+				err = walkFn(*object.Key, nil, nil)
+				if err != nil {
+					break
+				}
+				last = *object.Key
 			}
-			last = *object.Key
 		}
 	}
 
-	return nil
+	return
 }
