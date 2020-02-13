@@ -1,8 +1,10 @@
 package file
 
 import (
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/digilant/rfs"
 )
@@ -94,4 +96,56 @@ func (fs *Fs) Stat(path string) (rfs.Stat, error) {
 		}, nil
 	}
 	return nil, err
+}
+
+func (fs *Fs) ListDir(path string) ([]string, error) {
+	path = filepath.Join(fs.Root, path)
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	files, err := file.Readdirnames(0)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range files {
+		files[i] = filepath.Join(fs.Root, path, files[i])
+	}
+
+	return files, nil
+}
+
+func (fs *Fs) WalkDepth(path string, depth int, walkFn rfs.WalkFunc) error {
+	return fs.walk(path, depth, walkFn)
+}
+
+func (fs *Fs) Walk(path string, walkFn rfs.WalkFunc) error {
+	return fs.walk(path, -1, walkFn)
+}
+
+func (fs *Fs) walk(path string, depth int, walkFn rfs.WalkFunc) error {
+	err := filepath.Walk(filepath.Join(fs.Root, path), func(path string, info os.FileInfo, _ error) error {
+		if depth >= 0 {
+			look, err := filepath.Rel(fs.Root, path)
+			if err != nil {
+				look = path
+			}
+
+			if strings.Count(look, "/") <= depth {
+				return walkFn(path, info.IsDir())
+			}
+
+			return nil
+		}
+
+		return walkFn(path, info.IsDir())
+	})
+	if err == io.EOF {
+		err = nil
+	}
+
+	return err
 }

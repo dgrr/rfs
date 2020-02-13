@@ -231,12 +231,13 @@ func (fs *Fs) walk(root string, depth int, walkFn rfs.WalkFunc) (err error) {
 				path := aws.StringValue(object.Key)
 
 				if depth >= 0 {
-					look, err := filepath.Rel(root, path)
-					if err != nil {
+					look, er := filepath.Rel(root, path)
+					if er != nil {
 						look = path
 					}
+					// TODO: Doesn't work so well... println(look, depth, strings.Count(look, "/"))
 
-					mustBreak = strings.Count(look, "/") >= depth
+					mustBreak = strings.Count(look, "/") > depth
 					if mustBreak {
 						break
 					}
