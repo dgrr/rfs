@@ -53,12 +53,13 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 	_, err := os.Stat(filepath.Dir(path))
 	if err != nil && os.IsNotExist(err) {
 		err = os.MkdirAll(
-			filepath.Dir(path), 0600,
+			filepath.Dir(path), 0770,
 		)
 	}
 
 	if err == nil {
-		file, err := os.Create(path)
+		var file *os.File
+		file, err = os.Create(path)
 		if err == nil {
 			return &File{
 				path: path,
