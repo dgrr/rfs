@@ -82,6 +82,15 @@ func Dial(kind, root string, config Config) (Fs, error) {
 	return mfn(root, config)
 }
 
+// OpenFs ...
+func OpenFs(fsURL string, config Config) (Fs, error) {
+	uri, err := url.Parse(fsURL)
+	if err != nil {
+		return nil, err
+	}
+	return DialURL(uri, config)
+}
+
 func getRoot(path string) string {
 	path = filepath.Clean(path)
 	i := strings.IndexByte(path, filepath.Separator)
