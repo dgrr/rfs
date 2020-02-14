@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+func MustStat(info os.FileInfo, _ error) os.FileInfo {
+	return info
+}
+
 // File represents a file abstraction.
 type File interface {
 	// io.Closer implements the Close() function.

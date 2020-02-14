@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-func MustStat(info os.FileInfo, _ error) os.FileInfo {
-	return info
-}
-
 type FileInfo struct {
 	name    string
 	size    int64
