@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -27,6 +28,8 @@ type File interface {
 
 	// URL returns the file url.
 	URL() *url.URL
+
+	Stat() (os.FileInfo, error)
 }
 
 // Stat TODO
