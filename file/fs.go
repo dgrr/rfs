@@ -29,13 +29,13 @@ func (fs *Fs) Root() string {
 	return fs.root
 }
 
-func (fs *Fs) joinroot(path string) string {
+func (fs *Fs) joinRoot(path string) string {
 	return filepath.Join(fs.root, path)
 }
 
 // Open ...
 func (fs *Fs) Open(path string) (rfs.File, error) {
-	path = fs.joinroot(path)
+	path = fs.joinRoot(path)
 	file, err := os.Open(path)
 	if err == nil {
 		return &File{
@@ -48,7 +48,7 @@ func (fs *Fs) Open(path string) (rfs.File, error) {
 
 // Create ...
 func (fs *Fs) Create(path string) (rfs.File, error) {
-	path = fs.joinroot(path)
+	path = fs.joinRoot(path)
 
 	_, err := os.Stat(filepath.Dir(path))
 	if err != nil && os.IsNotExist(err) {
@@ -72,14 +72,14 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 // Remove ...
 func (fs *Fs) Remove(path string) error {
 	return os.Remove(
-		fs.joinroot(path),
+		fs.joinRoot(path),
 	)
 }
 
 // RemoveAll ...
 func (fs *Fs) RemoveAll(path string) error {
 	return os.RemoveAll(
-		fs.joinroot(path),
+		fs.joinRoot(path),
 	)
 }
 

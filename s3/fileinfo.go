@@ -5,9 +5,14 @@ import (
 	"time"
 )
 
+func MustStat(info os.FileInfo, _ error) os.FileInfo {
+	return info
+}
+
 type FileInfo struct {
 	name    string
 	size    int64
+	hash    string
 	modtime time.Time
 }
 
@@ -31,6 +36,10 @@ func (fi *FileInfo) ModTime() time.Time {
 
 func (fi *FileInfo) IsDir() bool {
 	return false
+}
+
+func (fi *FileInfo) ETag() string {
+	return fi.hash
 }
 
 func (fi *FileInfo) Sys() interface{} {

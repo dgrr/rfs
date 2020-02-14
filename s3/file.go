@@ -21,8 +21,7 @@ const (
 type File struct {
 	bucket   string
 	path     string
-	meta     map[string]interface{}
-	size     int64
+	meta     *FileInfo
 	cursor   int64
 	uploadID string
 	c        *s3aws.Client
@@ -52,6 +51,7 @@ type FileReader struct {
 type FileWriter struct {
 	File
 	partNum int64
+	size    int64
 	cmpl    s3aws.CompletedMultipartUpload
 	b       []byte
 }
@@ -63,7 +63,7 @@ func NewWriter(c *s3aws.Client) *FileWriter {
 		b:       make([]byte, fiveMB),
 	}
 	f.c = c
-	f.meta = make(map[string]interface{})
+
 	return f
 }
 
@@ -80,7 +80,7 @@ func (f *File) URL() *url.URL {
 
 // Read ...
 func (f *FileReader) Read(b []byte) (int, error) {
-	if f.cursor == f.size {
+	if f.cursor == f.meta.size {
 		return 0, io.EOF
 	}
 
@@ -102,8 +102,8 @@ func (f *FileReader) readAt(b []byte, offset int64) (int, error) {
 	}
 
 	max := offset + int64(len(b)-1)
-	if max > f.size {
-		max = f.size
+	if max > f.meta.size {
+		max = f.meta.size
 	}
 
 	resp, err := f.c.GetObjectRequest(&s3aws.GetObjectInput{
@@ -178,14 +178,16 @@ func (f *FileWriter) Flush() error {
 	size := f.cursor
 	partNum := f.partNum
 
-	resp, err := f.c.UploadPartRequest(&s3aws.UploadPartInput{
-		Bucket:        aws.String(f.bucket),
-		Key:           aws.String(f.path),
-		Body:          bytes.NewReader(f.b[:size]),
-		ContentLength: aws.Int64(int64(size)),
-		UploadId:      aws.String(f.uploadID),
-		PartNumber:    aws.Int64(partNum),
-	}).Send(context.Background())
+	resp, err := f.c.UploadPartRequest(
+		&s3aws.UploadPartInput{
+			Bucket:        aws.String(f.bucket),
+			Key:           aws.String(f.path),
+			Body:          bytes.NewReader(f.b[:size]),
+			ContentLength: aws.Int64(int64(size)),
+			UploadId:      aws.String(f.uploadID),
+			PartNumber:    aws.Int64(partNum),
+		},
+	).Send(context.Background())
 	if err != nil {
 		return fmt.Errorf("Flush(): %s", err)
 	}
@@ -234,23 +236,36 @@ func (f *FileWriter) Close() error {
 	f.c = nil
 	f.bucket = aws.StringValue(resp.Bucket)
 	f.path = aws.StringValue(resp.Key)
-	f.meta[ETag] = aws.StringValue(resp.ETag)
+	f.meta.hash = aws.StringValue(resp.ETag)
 
 	return nil
 }
 
 func (f *File) Stat() (os.FileInfo, error) {
-	fi := FileInfo{}
-	fi.name = f.path
-	req := f.c.HeadObjectRequest(&s3aws.HeadObjectInput{
-		Bucket: aws.String(f.bucket),
-		Key:    aws.String(f.path),
-	})
+	var err error
+	if f.meta == nil {
+		f.meta = new(FileInfo)
+		err = f.stat()
+	}
+	return f.meta, err
+}
+
+func (f *File) stat() error {
+	req := f.c.HeadObjectRequest(
+		&s3aws.HeadObjectInput{
+			Bucket: aws.String(f.bucket),
+			Key:    aws.String(f.path),
+		},
+	)
+
 	res, err := req.Send(context.Background())
 	if err != nil {
-		return nil, err
+		return err
 	}
-	fi.size = aws.Int64Value(res.ContentLength)
-	fi.modtime = aws.TimeValue(res.LastModified)
-	return &fi, nil
+
+	f.meta.name = f.path
+	f.meta.size = aws.Int64Value(res.ContentLength)
+	f.meta.modtime = aws.TimeValue(res.LastModified)
+
+	return nil
 }
