@@ -18,7 +18,7 @@ const (
 	fiveMB = 5 * 1024 * 1024
 )
 
-// File ...
+// File represents an abstract file.
 type File struct {
 	bucket   string
 	path     string
@@ -29,15 +29,17 @@ type File struct {
 	c        *s3aws.Client
 }
 
+// like virtual func
 func (f *File) Read(_ []byte) (int, error) {
 	return -1, errors.New("file not open for reading")
 }
 
-// ReadAt ...
+// like virtual func
 func (f *File) ReadAt(_ []byte, _ int64) (int, error) {
 	return -1, errors.New("file not open for reading")
 }
 
+// like virtual func
 func (f *File) Write(_ []byte) (int, error) {
 	return -1, errors.New("file not open for writing")
 }
@@ -209,7 +211,6 @@ func (f *FileReader) Close() error {
 	if f.c == nil {
 		return io.ErrClosedPipe
 	}
-
 	f.c = nil
 
 	return nil
@@ -225,12 +226,14 @@ func (f *FileWriter) Close() error {
 	if err != nil {
 		return err
 	}
-	resp, err := f.c.CompleteMultipartUploadRequest(&s3aws.CompleteMultipartUploadInput{
-		Bucket:          aws.String(f.bucket),
-		Key:             aws.String(f.path),
-		UploadId:        aws.String(f.uploadID),
-		MultipartUpload: &f.cmpl,
-	}).Send(context.Background())
+	resp, err := f.c.CompleteMultipartUploadRequest(
+		&s3aws.CompleteMultipartUploadInput{
+			Bucket:          aws.String(f.bucket),
+			Key:             aws.String(f.path),
+			UploadId:        aws.String(f.uploadID),
+			MultipartUpload: &f.cmpl,
+		},
+	).Send(context.Background())
 	if err != nil {
 		return fmt.Errorf("Close(): %s", err)
 	}
