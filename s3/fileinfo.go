@@ -22,7 +22,7 @@ func (fi *FileInfo) Size() int64 {
 }
 
 func (fi *FileInfo) Mode() os.FileMode {
-	return nil
+	return 0
 }
 
 func (fi *FileInfo) ModTime() time.Time {
