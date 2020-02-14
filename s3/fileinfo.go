@@ -12,6 +12,13 @@ type FileInfo struct {
 	modtime time.Time
 }
 
+func (fi *FileInfo) isEmpty() bool {
+	return len(fi.name) == 0 ||
+		fi.size == 0 ||
+		len(fi.hash) == 0 ||
+		fi.modtime.IsZero()
+}
+
 // Name returns the name of the file
 func (fi *FileInfo) Name() string {
 	return fi.name

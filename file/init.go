@@ -9,4 +9,5 @@ const (
 
 func init() {
 	rfs.Register(Kind, makeFs)
+	rfs.Register("", makeFs)
 }

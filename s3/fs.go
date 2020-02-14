@@ -97,6 +97,7 @@ func (fs *Fs) Open(path string) (rfs.File, error) {
 		file.c = fs.c
 		file.bucket = fs.bucket
 		file.path = path
+		file.meta = new(FileInfo)
 	}
 
 	return file, file.stat()

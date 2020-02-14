@@ -62,6 +62,7 @@ func NewWriter(c *s3aws.Client) *FileWriter {
 		partNum: 1,
 		b:       make([]byte, fiveMB),
 	}
+	f.meta = new(FileInfo)
 	f.c = c
 
 	return f
@@ -243,8 +244,7 @@ func (f *FileWriter) Close() error {
 
 func (f *File) Stat() (os.FileInfo, error) {
 	var err error
-	if f.meta == nil {
-		f.meta = new(FileInfo)
+	if f.meta.isEmpty() {
 		err = f.stat()
 	}
 	return f.meta, err
