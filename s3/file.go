@@ -7,8 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-
-	"github.com/digilant/rfs"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	s3aws "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -77,11 +76,6 @@ func (f *File) URL() *url.URL {
 		return uri
 	}
 	return nil
-}
-
-// Stat ...
-func (f *File) Stat() (rfs.Stat, error) {
-	return f.meta, nil
 }
 
 // Read ...
@@ -243,4 +237,20 @@ func (f *FileWriter) Close() error {
 	f.meta[ETag] = aws.StringValue(resp.ETag)
 
 	return nil
+}
+
+func (f *File) Stat() (os.FileInfo, error) {
+	fi := FileInfo{}
+	fi.name = f.path
+	req := f.c.HeadObjectRequest(&s3aws.HeadObjectInput{
+		Bucket: aws.String(f.bucket),
+		Key:    aws.String(f.path),
+	})
+	res, err := req.Send(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	fi.size = aws.Int64Value(res.ContentLength)
+	fi.modtime = aws.TimeValue(res.LastModified)
+	return &fi, nil
 }
