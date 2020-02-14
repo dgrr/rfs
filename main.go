@@ -57,10 +57,13 @@ type Fs interface {
 	// RemoveAll removes all the files and directories recursively.
 	RemoveAll(path string) error
 
+	// ListDir returns the filenames of the given directory.
 	ListDir(path string) ([]string, error)
 
+	// Walk performs a recursive walk over the given root path.
 	Walk(root string, walkFn WalkFunc) error
 
+	// WalkDepth performs a recursive walk limited by the given depth.
 	WalkDepth(root string, depth int, walkFn WalkFunc) error
 }
 
