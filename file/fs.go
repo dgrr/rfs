@@ -11,27 +11,31 @@ import (
 
 func makeFs(root string, config rfs.Config) (rfs.Fs, error) {
 	return &Fs{
-		Root: root,
+		root: root,
 	}, nil
 }
 
 // Fs ...
 type Fs struct {
-	Root string
+	root string
 }
 
 // Name ...
 func (fs *Fs) Name() string {
-	return fs.Root
+	return "file"
 }
 
-func (fs *Fs) joinRoot(path string) string {
-	return filepath.Join(fs.Root, path)
+func (fs *Fs) Root() string {
+	return fs.root
+}
+
+func (fs *Fs) joinroot(path string) string {
+	return filepath.Join(fs.root, path)
 }
 
 // Open ...
 func (fs *Fs) Open(path string) (rfs.File, error) {
-	path = fs.joinRoot(path)
+	path = fs.joinroot(path)
 	file, err := os.Open(path)
 	if err == nil {
 		return &File{
@@ -44,7 +48,7 @@ func (fs *Fs) Open(path string) (rfs.File, error) {
 
 // Create ...
 func (fs *Fs) Create(path string) (rfs.File, error) {
-	path = fs.joinRoot(path)
+	path = fs.joinroot(path)
 
 	_, err := os.Stat(filepath.Dir(path))
 	if err != nil && os.IsNotExist(err) {
@@ -68,14 +72,14 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 // Remove ...
 func (fs *Fs) Remove(path string) error {
 	return os.Remove(
-		fs.joinRoot(path),
+		fs.joinroot(path),
 	)
 }
 
 // RemoveAll ...
 func (fs *Fs) RemoveAll(path string) error {
 	return os.RemoveAll(
-		fs.joinRoot(path),
+		fs.joinroot(path),
 	)
 }
 
@@ -87,7 +91,7 @@ const (
 // Stat ...
 func (fs *Fs) Stat(path string) (rfs.Stat, error) {
 	st, err := os.Stat(
-		filepath.Join(fs.Root, path),
+		filepath.Join(fs.root, path),
 	)
 	if err == nil {
 		return rfs.Stat{
@@ -99,7 +103,7 @@ func (fs *Fs) Stat(path string) (rfs.Stat, error) {
 }
 
 func (fs *Fs) ListDir(path string) ([]string, error) {
-	path = filepath.Join(fs.Root, path)
+	path = filepath.Join(fs.root, path)
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -112,7 +116,7 @@ func (fs *Fs) ListDir(path string) ([]string, error) {
 	}
 
 	for i := range files {
-		files[i] = filepath.Join(fs.Root, path, files[i])
+		files[i] = filepath.Join(fs.root, path, files[i])
 	}
 
 	return files, nil
@@ -127,9 +131,9 @@ func (fs *Fs) Walk(path string, walkFn rfs.WalkFunc) error {
 }
 
 func (fs *Fs) walk(path string, depth int, walkFn rfs.WalkFunc) error {
-	err := filepath.Walk(filepath.Join(fs.Root, path), func(path string, info os.FileInfo, _ error) error {
+	err := filepath.Walk(filepath.Join(fs.root, path), func(path string, info os.FileInfo, _ error) error {
 		if depth >= 0 {
-			look, err := filepath.Rel(fs.Root, path)
+			look, err := filepath.Rel(fs.root, path)
 			if err != nil {
 				look = path
 			}

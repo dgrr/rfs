@@ -79,6 +79,10 @@ type Fs struct {
 
 // Name returns the bucket name.
 func (fs *Fs) Name() string {
+	return "s3"
+}
+
+func (fs *Fs) Root() string {
 	return fs.bucket
 }
 

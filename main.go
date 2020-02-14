@@ -40,6 +40,8 @@ type Fs interface {
 	// Name returns the filesytem name.
 	Name() string
 
+	Root() string
+
 	// Open returns a read-only file.
 	Open(path string) (File, error)
 
