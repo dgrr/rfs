@@ -99,7 +99,7 @@ func (f *FileReader) ReadAt(p []byte, off int64) (int, error) {
 
 func (f *FileReader) readAt(b []byte, offset int64) (int, error) {
 	if f.c == nil {
-		return -1, io.ErrClosedPipe
+		return 0, io.ErrClosedPipe
 	}
 
 	max := offset + int64(len(b)-1)
@@ -115,7 +115,7 @@ func (f *FileReader) readAt(b []byte, offset int64) (int, error) {
 		),
 	}).Send(context.Background())
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	n, err := io.Copy(&byteWriter{b, 0}, resp.Body)
