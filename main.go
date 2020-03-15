@@ -28,7 +28,7 @@ type File interface {
 	io.ReaderAt
 
 	// io.Seeker implements the Seek() function.
-	// TODO: io.Seeker
+	io.Seeker
 
 	// URL returns the file url.
 	URL() *url.URL
