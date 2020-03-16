@@ -167,6 +167,36 @@ func Create(fileURI string, config Config) (File, error) {
 	return nil, err
 }
 
+// Remove ...
+func Remove(fileURI string, config Config) error {
+	uri, err := url.Parse(fileURI)
+	if err != nil {
+		return err
+	}
+
+	fs, err := Dial(uri.Scheme, uri.Host, config)
+	if err == nil {
+		err = fs.Remove(uri.Path)
+	}
+
+	return err
+}
+
+// RemoveAll ...
+func RemoveAll(fileURI string, config Config) error {
+	uri, err := url.Parse(fileURI)
+	if err != nil {
+		return err
+	}
+
+	fs, err := Dial(uri.Scheme, uri.Host, config)
+	if err == nil {
+		err = fs.RemoveAll(uri.Path)
+	}
+
+	return err
+}
+
 type (
 	// MakeFunc ...
 	MakeFunc func(root string, config Config) (Fs, error)
