@@ -25,6 +25,7 @@ type File struct {
 	cursor   int64
 	uploadID string
 	c        *s3aws.Client
+	b        []byte // buffered content
 }
 
 // like virtual func
@@ -53,15 +54,23 @@ type FileWriter struct {
 	partNum int64
 	size    int64
 	cmpl    s3aws.CompletedMultipartUpload
-	b       []byte
+}
+
+// NewReader ...
+func NewReader(c *s3aws.Client) *FileReader {
+	f := &FileReader{}
+	f.meta = new(FileInfo)
+	f.c = c
+	return f
 }
 
 // NewWriter ...
 func NewWriter(c *s3aws.Client) *FileWriter {
 	f := &FileWriter{
 		partNum: 1,
-		b:       make([]byte, fiveMB),
+		size:    fiveMB,
 	}
+	f.b = make([]byte, fiveMB)
 	f.meta = new(FileInfo)
 	f.c = c
 
@@ -85,11 +94,30 @@ func (f *FileReader) Read(b []byte) (int, error) {
 		return 0, io.EOF
 	}
 
-	n, err := f.readAt(b, f.cursor)
+	bLen := len(f.b)
+	cped := copy(b, f.b)
+	f.b = append(f.b[:0], f.b[cped:]...)
+	f.cursor += int64(cped)
+
+	if bLen >= len(b) {
+		return cped, nil
+	}
+
+	nextMB := f.cursor + fiveMB
+	if nextMB > f.meta.size {
+		nextMB = f.meta.size
+	}
+
+	f.b = resize(f.b, 1+nextMB-f.cursor)
+
+	n, err := f.readRange(f.b, f.cursor, nextMB)
 	if err == nil {
+		n = copy(b[cped:], f.b)
+		f.b = append(f.b[:0], f.b[n:]...)
 		f.cursor += int64(n)
 	}
-	return n, err
+
+	return cped + n, err
 }
 
 // ReadAt ...
@@ -107,6 +135,10 @@ func (f *FileReader) readAt(b []byte, offset int64) (int, error) {
 		max = f.meta.size
 	}
 
+	return f.readRange(b, offset, max)
+}
+
+func (f *FileReader) readRange(b []byte, offset, max int64) (int, error) {
 	resp, err := f.c.GetObjectRequest(&s3aws.GetObjectInput{
 		Bucket: aws.String(f.bucket),
 		Key:    aws.String(f.path),
@@ -144,7 +176,7 @@ func (f *FileWriter) Write(b []byte) (n int, err error) {
 	if f.c == nil {
 		return -1, io.ErrClosedPipe
 	}
-	if f.cursor == int64(len(f.b)) {
+	if f.cursor == f.size {
 		err = f.Flush()
 		if err == nil {
 			f.cursor = 0

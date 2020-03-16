@@ -1,6 +1,16 @@
 package s3
 
-import "io"
+import (
+	"io"
+)
+
+func resize(b []byte, needed int64) []byte {
+	b = b[:cap(b)]
+	if n := needed - int64(cap(b)); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+	return b[:needed]
+}
 
 type byteWriter struct {
 	b []byte

@@ -92,12 +92,10 @@ func (fs *Fs) Open(path string) (rfs.File, error) {
 		path = path[1:]
 	}
 
-	file := &FileReader{}
+	file := NewReader(fs.c)
 	{
-		file.c = fs.c
 		file.bucket = fs.bucket
 		file.path = path
-		file.meta = new(FileInfo)
 	}
 
 	return file, file.stat()
