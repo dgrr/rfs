@@ -144,19 +144,18 @@ func (f *FileWriter) Write(b []byte) (n int, err error) {
 	if f.c == nil {
 		return -1, io.ErrClosedPipe
 	}
+	if f.cursor == int64(len(f.b)) {
+		err = f.Flush()
+		if err == nil {
+			f.cursor = 0
+		}
+	}
+	if err != nil {
+		return -1, err
+	}
 
 	n = copy(f.b[f.cursor:], b)
 	f.cursor += int64(n)
-
-	if f.cursor == f.size {
-		r := len(b) - n // bytes to append
-		err = f.Flush()
-		if err == nil {
-			f.b = append(f.b[:0], b[n:]...)
-			f.cursor = int64(r)
-			n += r // append bytes readed
-		}
-	}
 
 	return n, err
 }
@@ -197,7 +196,6 @@ func (f *FileWriter) Flush() error {
 		PartNumber: &partNum,
 	})
 
-	f.size = 0
 	f.partNum++
 
 	return nil
