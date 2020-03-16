@@ -158,7 +158,7 @@ func (f *FileWriter) Write(b []byte) (n int, err error) {
 		}
 	}
 
-	return n, nil
+	return n, err
 }
 
 // Seek ...
