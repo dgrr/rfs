@@ -36,9 +36,6 @@ type File interface {
 	Stat() (os.FileInfo, error)
 }
 
-// Stat TODO
-type Stat map[string]interface{}
-
 // WalkFunc ...
 type WalkFunc func(path string, isDir bool) error
 
@@ -52,6 +49,7 @@ type Fs interface {
 	// Open returns a read-only file.
 	Open(path string) (File, error)
 
+	// Stat TODO ...
 	Stat(path string) (os.FileInfo, error)
 
 	// Create a write-only file.
@@ -129,6 +127,21 @@ func DialURL(uri *url.URL, config Config) (Fs, error) {
 		uri.Host = getRoot(uri.Path)
 	}
 	return Dial(uri.Scheme, uri.Host, config)
+}
+
+// Stat ...
+func Stat(fileURI string, config Config) (os.FileInfo, error) {
+	uri, err := url.Parse(fileURI)
+	if err != nil {
+		return nil, err
+	}
+
+	fs, err := Dial(uri.Scheme, uri.Host, config)
+	if err == nil {
+		return fs.Stat(uri.Path)
+	}
+
+	return nil, err
 }
 
 // Open returns a File avoiding Fs handling.
