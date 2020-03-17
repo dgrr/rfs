@@ -52,6 +52,8 @@ type Fs interface {
 	// Open returns a read-only file.
 	Open(path string) (File, error)
 
+	Stat(path string) (os.FileInfo, error)
+
 	// Create a write-only file.
 	//
 	// If the path where the file is located doesn't exits

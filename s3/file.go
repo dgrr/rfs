@@ -272,6 +272,7 @@ func (f *FileWriter) Close() error {
 	return nil
 }
 
+// Stat ...
 func (f *File) Stat() (os.FileInfo, error) {
 	var err error
 	if f.meta.isEmpty() {
@@ -281,21 +282,10 @@ func (f *File) Stat() (os.FileInfo, error) {
 }
 
 func (f *File) stat() error {
-	req := f.c.HeadObjectRequest(
-		&s3aws.HeadObjectInput{
-			Bucket: aws.String(f.bucket),
-			Key:    aws.String(f.path),
-		},
-	)
-
-	res, err := req.Send(context.Background())
-	if err != nil {
-		return err
+	st, err := stat(f.c, f.bucket, f.path)
+	if err == nil {
+		f.meta = st
 	}
 
-	f.meta.name = f.path
-	f.meta.size = aws.Int64Value(res.ContentLength)
-	f.meta.modtime = aws.TimeValue(res.LastModified)
-
-	return nil
+	return err
 }

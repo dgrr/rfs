@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -82,8 +83,34 @@ func (fs *Fs) Name() string {
 	return "s3"
 }
 
+// Root ...
 func (fs *Fs) Root() string {
 	return fs.bucket
+}
+
+// Stat ...
+func (fs *Fs) Stat(path string) (os.FileInfo, error) {
+	return stat(fs.c, fs.bucket, path)
+}
+
+func stat(c *s3aws.Client, bucket, path string) (*FileInfo, error) {
+	req := c.HeadObjectRequest(
+		&s3aws.HeadObjectInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(path),
+		},
+	)
+
+	res, err := req.Send(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	return &FileInfo{
+		name:    path,
+		size:    aws.Int64Value(res.ContentLength),
+		modtime: aws.TimeValue(res.LastModified),
+	}, nil
 }
 
 // Open ...

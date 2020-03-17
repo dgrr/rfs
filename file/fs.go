@@ -90,17 +90,10 @@ const (
 )
 
 // Stat ...
-func (fs *Fs) Stat(path string) (rfs.Stat, error) {
-	st, err := os.Stat(
+func (fs *Fs) Stat(path string) (os.FileInfo, error) {
+	return os.Stat(
 		filepath.Join(fs.root, path),
 	)
-	if err == nil {
-		return rfs.Stat{
-			StatName: st.Name(),
-			StatSize: st.Size(),
-		}, nil
-	}
-	return nil, err
 }
 
 func (fs *Fs) ListDir(path string) ([]string, error) {
