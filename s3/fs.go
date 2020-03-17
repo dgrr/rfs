@@ -94,6 +94,8 @@ func (fs *Fs) Stat(path string) (os.FileInfo, error) {
 }
 
 func stat(c *s3aws.Client, bucket, path string) (*FileInfo, error) {
+	path = cleanPath(path)
+
 	req := c.HeadObjectRequest(
 		&s3aws.HeadObjectInput{
 			Bucket: aws.String(bucket),
@@ -113,11 +115,16 @@ func stat(c *s3aws.Client, bucket, path string) (*FileInfo, error) {
 	}, nil
 }
 
-// Open ...
-func (fs *Fs) Open(path string) (rfs.File, error) {
+func cleanPath(path string) string {
 	if filepath.IsAbs(path) {
 		path = path[1:]
 	}
+	return path
+}
+
+// Open ...
+func (fs *Fs) Open(path string) (rfs.File, error) {
+	path = cleanPath(path)
 
 	file := NewReader(fs.c)
 	{
@@ -130,9 +137,7 @@ func (fs *Fs) Open(path string) (rfs.File, error) {
 
 // Create ...
 func (fs *Fs) Create(path string) (rfs.File, error) {
-	if filepath.IsAbs(path) {
-		path = path[1:]
-	}
+	path = cleanPath(path)
 
 	file := NewWriter(fs.c)
 	{
@@ -156,9 +161,7 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 
 // Remove ...
 func (fs *Fs) Remove(path string) error {
-	if filepath.IsAbs(path) {
-		path = path[1:]
-	}
+	path = cleanPath(path)
 
 	_, err := fs.c.DeleteObjectRequest(&s3aws.DeleteObjectInput{
 		Bucket: aws.String(fs.bucket),
@@ -174,9 +177,7 @@ func (fs *Fs) RemoveAll(path string) error {
 }
 
 func (fs *Fs) ListDir(path string) ([]string, error) {
-	if filepath.IsAbs(path) {
-		path = path[1:]
-	}
+	path = cleanPath(path)
 
 	files := make([]string, 0)
 	for {
@@ -216,9 +217,7 @@ func (fs *Fs) Walk(root string, walkFn rfs.WalkFunc) error {
 }
 
 func (fs *Fs) walk(root string, depth int, walkFn rfs.WalkFunc) (err error) {
-	if filepath.IsAbs(root) {
-		root = root[1:]
-	}
+	root = cleanPath(root)
 
 	mustBreak := false
 	last := ""
