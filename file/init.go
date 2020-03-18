@@ -1,6 +1,6 @@
 package file
 
-import "github.com/digilant/rfs"
+import "github.com/dgrr/rfs"
 
 const (
 	// Kind ...

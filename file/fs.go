@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/digilant/rfs"
+	"github.com/dgrr/rfs"
 )
 
 func makeFs(root string, config rfs.Config) (rfs.Fs, error) {

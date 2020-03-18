@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/digilant/rfs"
-	_ "github.com/digilant/rfs/s3"
+	"github.com/dgrr/rfs"
+	_ "github.com/dgrr/rfs/s3"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 		log.Fatalln("dial error:", err)
 	}
 
-	file, err := fs.Create("/digilant/hello")
+	file, err := fs.Create("/dgrr/hello")
 	if err != nil {
 		log.Fatalln("open error:", err)
 	}
