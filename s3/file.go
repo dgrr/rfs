@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	s3aws "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 const (
@@ -51,9 +52,9 @@ type FileReader struct {
 // FileWriter ...
 type FileWriter struct {
 	File
-	partNum int64
+	partNum int32
 	size    int64
-	cmpl    s3aws.CompletedMultipartUpload
+	cmpl    types.CompletedMultipartUpload
 }
 
 // NewReader ...
@@ -139,13 +140,14 @@ func (f *FileReader) readAt(b []byte, offset int64) (int, error) {
 }
 
 func (f *FileReader) readRange(b []byte, offset, max int64) (int, error) {
-	resp, err := f.c.GetObjectRequest(&s3aws.GetObjectInput{
-		Bucket: aws.String(f.bucket),
-		Key:    aws.String(f.path),
-		Range: aws.String(
-			fmt.Sprintf("bytes=%d-%d", offset, max),
-		),
-	}).Send(context.Background())
+	resp, err := f.c.GetObject(context.Background(),
+		&s3aws.GetObjectInput{
+			Bucket: aws.String(f.bucket),
+			Key:    aws.String(f.path),
+			Range: aws.String(
+				fmt.Sprintf("bytes=%d-%d", offset, max),
+			),
+		})
 	if err != nil {
 		return 0, err
 	}
@@ -210,20 +212,21 @@ func (f *FileWriter) Flush() error {
 	size := f.cursor
 	partNum := f.partNum
 
-	resp, err := f.c.UploadPartRequest(
+	resp, err := f.c.UploadPart(
+		context.Background(),
 		&s3aws.UploadPartInput{
 			Bucket:        aws.String(f.bucket),
 			Key:           aws.String(f.path),
 			Body:          bytes.NewReader(f.b[:size]),
 			ContentLength: aws.Int64(int64(size)),
 			UploadId:      aws.String(f.uploadID),
-			PartNumber:    aws.Int64(partNum),
+			PartNumber:    aws.Int32(partNum),
 		},
-	).Send(context.Background())
+	)
 	if err != nil {
 		return fmt.Errorf("Flush(): %s", err)
 	}
-	f.cmpl.Parts = append(f.cmpl.Parts, s3aws.CompletedPart{
+	f.cmpl.Parts = append(f.cmpl.Parts, &types.CompletedPart{
 		ETag:       resp.ETag,
 		PartNumber: &partNum,
 	})
@@ -253,21 +256,22 @@ func (f *FileWriter) Close() error {
 	if err != nil {
 		return err
 	}
-	resp, err := f.c.CompleteMultipartUploadRequest(
+	resp, err := f.c.CompleteMultipartUpload(
+		context.Background(),
 		&s3aws.CompleteMultipartUploadInput{
 			Bucket:          aws.String(f.bucket),
 			Key:             aws.String(f.path),
 			UploadId:        aws.String(f.uploadID),
 			MultipartUpload: &f.cmpl,
 		},
-	).Send(context.Background())
+	)
 	if err != nil {
 		return fmt.Errorf("Close(): %s", err)
 	}
 	f.c = nil
-	f.bucket = aws.StringValue(resp.Bucket)
-	f.path = aws.StringValue(resp.Key)
-	f.meta.hash = aws.StringValue(resp.ETag)
+	f.bucket = aws.ToString(resp.Bucket)
+	f.path = aws.ToString(resp.Key)
+	f.meta.hash = aws.ToString(resp.ETag)
 
 	return nil
 }

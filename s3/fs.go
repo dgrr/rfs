@@ -9,24 +9,24 @@ import (
 	"github.com/dgrr/rfs"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3aws "github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/s3manager"
 )
 
 func getAWSConfig(region, profile string) (aws.Config, error) {
-	var options []external.Config
+	var options []config.Config
 	if len(region) > 0 {
-		options = append(options, external.WithRegion(region))
+		options = append(options, config.WithRegion(region))
 	}
 	if len(profile) > 0 {
 		options = append(
-			options, external.WithSharedConfigProfile(profile),
+			options, config.WithSharedConfigProfile(profile),
 		)
 	}
 
-	return external.LoadDefaultAWSConfig(options...)
+	return config.LoadDefaultConfig(options...)
 }
 
 func makeFs(bucket string, config rfs.Config) (rfs.Fs, error) {
@@ -51,7 +51,7 @@ func makeFs(bucket string, config rfs.Config) (rfs.Fs, error) {
 		}
 		awsConfig, err = getAWSConfig(region, profile)
 	} else {
-		awsConfig.Credentials = aws.NewStaticCredentialsProvider(
+		awsConfig.Credentials = credentials.NewStaticCredentialsProvider(
 			config[KeyID], config[SecretID], config[SessionToken],
 		)
 	}
@@ -59,12 +59,12 @@ func makeFs(bucket string, config rfs.Config) (rfs.Fs, error) {
 		return nil, err
 	}
 
-	region, err = s3manager.GetBucketRegion(context.Background(), awsConfig, bucket, region)
-	if err == nil && len(region) > 0 {
-		awsConfig.Region = region
-	}
+	// region, err = s3manager.GetBucketRegion(context.Background(), awsConfig, bucket, region)
+	// if err == nil && len(region) > 0 {
+	// 	awsConfig.Region = region
+	// }
 
-	c := s3aws.New(awsConfig)
+	c := s3aws.NewFromConfig(awsConfig)
 
 	return &Fs{
 		bucket: bucket,
@@ -96,22 +96,18 @@ func (fs *Fs) Stat(path string) (os.FileInfo, error) {
 func stat(c *s3aws.Client, bucket, path string) (*FileInfo, error) {
 	path = cleanPath(path)
 
-	req := c.HeadObjectRequest(
-		&s3aws.HeadObjectInput{
-			Bucket: aws.String(bucket),
-			Key:    aws.String(path),
-		},
-	)
-
-	res, err := req.Send(context.Background())
+	res, err := c.HeadObject(context.Background(), &s3aws.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(path),
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	return &FileInfo{
 		name:    path,
-		size:    aws.Int64Value(res.ContentLength),
-		modtime: aws.TimeValue(res.LastModified),
+		size:    aws.ToInt64(res.ContentLength),
+		modtime: aws.ToTime(res.LastModified),
 	}, nil
 }
 
@@ -145,16 +141,16 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 		file.path = path
 	}
 
-	resp, err := fs.c.CreateMultipartUploadRequest(
+	resp, err := fs.c.CreateMultipartUpload(context.Background(),
 		&s3aws.CreateMultipartUploadInput{
 			Bucket: aws.String(fs.bucket),
 			Key:    aws.String(path),
 		},
-	).Send(context.Background())
+	)
 	if err != nil {
 		return nil, err
 	}
-	file.uploadID = aws.StringValue(resp.UploadId)
+	file.uploadID = aws.ToString(resp.UploadId)
 
 	return file, nil
 }
@@ -163,10 +159,10 @@ func (fs *Fs) Create(path string) (rfs.File, error) {
 func (fs *Fs) Remove(path string) error {
 	path = cleanPath(path)
 
-	_, err := fs.c.DeleteObjectRequest(&s3aws.DeleteObjectInput{
+	_, err := fs.c.DeleteObject(context.Background(), &s3aws.DeleteObjectInput{
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(path),
-	}).Send(context.Background())
+	})
 	// TODO: check response.DeleteMarker ?
 	return err
 }
@@ -176,20 +172,19 @@ func (fs *Fs) RemoveAll(path string) error {
 	return nil
 }
 
+// ListDir ...
 func (fs *Fs) ListDir(path string) ([]string, error) {
 	path = cleanPath(path)
 
 	files := make([]string, 0)
 	for {
-		req := fs.c.ListObjectsV2Request(
-			&s3.ListObjectsV2Input{
+		res, err := fs.c.ListObjectsV2(
+			context.Background(), &s3.ListObjectsV2Input{
 				Bucket:    aws.String(fs.bucket),
 				Prefix:    aws.String(path),
 				Delimiter: aws.String("/"),
 			},
 		)
-
-		res, err := req.Send(context.Background())
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +193,7 @@ func (fs *Fs) ListDir(path string) ([]string, error) {
 		}
 
 		for _, object := range res.Contents {
-			files = append(files, aws.StringValue(object.Key))
+			files = append(files, aws.ToString(object.Key))
 		}
 	}
 
@@ -222,16 +217,14 @@ func (fs *Fs) walk(root string, depth int, walkFn rfs.WalkFunc) (err error) {
 	mustBreak := false
 	last := ""
 	for err == nil && !mustBreak {
-
-		req := fs.c.ListObjectsV2Request(
+		res, er := fs.c.ListObjectsV2(
+			context.Background(),
 			&s3.ListObjectsV2Input{
 				Bucket:     aws.String(fs.bucket),
 				Prefix:     aws.String(root),
 				StartAfter: aws.String(last),
 			},
 		)
-
-		res, er := req.Send(context.Background())
 		if er != nil {
 			err = er
 		}
@@ -241,7 +234,7 @@ func (fs *Fs) walk(root string, depth int, walkFn rfs.WalkFunc) (err error) {
 
 		if err == nil {
 			for _, object := range res.Contents {
-				path := aws.StringValue(object.Key)
+				path := aws.ToString(object.Key)
 
 				if depth >= 0 {
 					look, er := filepath.Rel(root, path)
